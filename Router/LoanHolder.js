@@ -81,7 +81,7 @@ router.post("/subtractBalance", async (req, res) => {
     if (loanHolderIndex !== -1) {
       // Update balance
       if (amount > user.LoanHolders[loanHolderIndex].LoanHolderBalance) {
-  return res.json({ message: "Enter less than the Balance amount" });
+  return res.json({ invalidmessage: "Enter less than the Balance amount" });
 }
       user.LoanHolders[loanHolderIndex].LoanHolderBalance -= amount;
 
