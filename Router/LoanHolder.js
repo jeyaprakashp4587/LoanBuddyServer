@@ -2,9 +2,11 @@ const express = require("express");
 const router = express.Router();
 const moment = require("moment");
 const User = require("../Model/User");
+
 // Add the API route to save loan holder details
 router.post("/AddLoanHolder", async (req, res) => {
   const { loanHolderName, loanHolderAmount, image, id } = req.body;
+
   try {
     const user = await User.findById(id);
     if (user) {
@@ -12,24 +14,30 @@ router.post("/AddLoanHolder", async (req, res) => {
         (name) =>
           name.LoanHolderName.toLowerCase() == loanHolderName.toLowerCase()
       );
+
       if (existsHolder) {
-        res.status(200).json({ exits: existsHolder });
-        return;
+        return res.status(200).json({ exists: existsHolder });
       }
+
       user.LoanHolders.push({
         LoanHolderName: loanHolderName,
-        LoanHolderProfileImg: image ? image : null,
-        LoanHolderBalance: loanHolderAmount ? loanHolderAmount : null,
+        LoanHolderProfileImg: image || null,
+        LoanHolderBalance: loanHolderAmount || 0,
         LoanHolderHistory: [],
       });
-      user.save();
-      res.json({ user: user });
+
+      await user.save(); // Ensure save is awaited
+
+      return res.status(200).json({ user });
+    } else {
+      return res.status(404).json({ message: "User not found" });
     }
   } catch (err) {
-    res.send("some thing wrong");
+    return res.status(500).json({ message: "Something went wrong", error: err });
   }
 });
-// add and subtract
+
+// Add balance
 router.post("/addBalance", async (req, res) => {
   const { userId, loanHolderName, amount } = req.body;
 
@@ -55,16 +63,17 @@ router.post("/addBalance", async (req, res) => {
       user.LoanHolders.unshift(loanHolder);
 
       await user.save();
-      res.status(200).json({
+
+      return res.status(200).json({
         message: "Balance added successfully and loan holder moved to the top",
         loanHolder,
         user,
       });
     } else {
-      res.status(404).json({ message: "Loan holder not found" });
+      return res.status(404).json({ message: "Loan holder not found" });
     }
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error });
   }
 });
 
@@ -79,10 +88,14 @@ router.post("/subtractBalance", async (req, res) => {
     );
 
     if (loanHolderIndex !== -1) {
-      // Update balance
+      // Check if the amount exceeds the current balance
       if (amount > user.LoanHolders[loanHolderIndex].LoanHolderBalance) {
-  return res.json({ invalidmessage: "Enter less than the Balance amount" });
-}
+        return res
+          .status(400)
+          .json({ message: "Amount exceeds available loan balance" });
+      }
+
+      // Subtract the balance
       user.LoanHolders[loanHolderIndex].LoanHolderBalance -= amount;
 
       // Save the transaction in LoanHolderHistory
@@ -97,38 +110,47 @@ router.post("/subtractBalance", async (req, res) => {
       user.LoanHolders.unshift(loanHolder);
 
       await user.save();
-      res.status(200).json({
+
+      return res.status(200).json({
         message:
           "Balance subtracted successfully and loan holder moved to the top",
         loanHolder,
         user,
       });
     } else {
-      res.status(404).json({ message: "Loan holder not found" });
+      return res.status(404).json({ message: "Loan holder not found" });
     }
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error });
   }
 });
 
-// delete the loan holder
+// Delete loan holder
 router.delete("/deleteLoanHolder/:userId/:loanHolderId", async (req, res) => {
   const { userId, loanHolderId } = req.params;
+
   try {
     const user = await User.findById(userId);
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    // Filter out the loan holder that matches the loanHolderId
+
+    // Filter out the loan holder with the matching loanHolderId
     user.LoanHolders = user.LoanHolders.filter(
       (loanHolder) => loanHolder._id.toString() !== loanHolderId
     );
-    // Save the updated user
-    await user.save();
-    res.status(200).json({ message: "Loan holder deleted successfully", user });
+
+    await user.save(); // Ensure save is awaited
+
+    return res.status(200).json({
+      message: "Loan holder deleted successfully",
+      user,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting loan holder", error });
+    return res.status(500).json({ message: "Error deleting loan holder", error });
   }
 });
 
 module.exports = router;
+
